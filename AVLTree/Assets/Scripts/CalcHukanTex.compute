@@ -1,0 +1,408 @@
+#pragma kernel MainCalc
+#pragma kernel PointSet
+#pragma kernel AVLInsert
+
+//-134217728 ~ 134217727
+/*
+//5*uint ver
+struct MyStruct
+{
+    int2 key;
+    int lid;
+    int rid;
+    uint datahlb;
+};
+*/
+
+//4*uint ver
+struct MyStruct
+{
+    uint2 key;
+    int lid;
+    int rid;
+};
+
+RWTexture2D<float4> Tex;
+RWStructuredBuffer<MyStruct> KeyBuffer;
+RWStructuredBuffer<uint2> ValBuffer;
+RWStructuredBuffer<uint> IntData;//0:rootid,1:cnt?
+
+int inputx, inputy, idata;
+
+int key_[2];//CPU
+uint val_[2];//CPU
+
+
+//a<b -1,a==b 0,a>b 1
+int LER(int2 a, int2 b)
+{
+    if (a.y < b.y) return -1;
+    if (a.y > b.y) return 1;
+    if (a.x < b.x) return -1;
+    if (a.x > b.x) return 1;
+    return 0;
+}
+
+
+/*
+void StoP(MyStruct st, out int2 key, out int lid, out int rid, out int h, out int lb)
+{
+    lid = st.lid;
+    rid = st.rid;
+    key = st.key;
+    lb = (int)(st.datahlb / 64);
+    h = (int)(st.datahlb % 64);
+    lb -= 2;
+}
+
+void PtoS(out MyStruct st, int2 key, int lid, int rid, int h, int lb)
+{
+    lb += 2;
+    st.datahlb = (uint)lb * 64 + (uint)h;
+    st.lid = lid;
+    st.rid = rid;
+    st.key = key;
+}
+*/
+
+
+void StoP(MyStruct st, out int2 key, out int lid, out int rid, out int h, out int lb)
+{
+    lid = st.lid;
+    rid = st.rid;
+
+    uint data;
+
+    uint x, y;
+    uint s0 = st.key.x;
+    uint s1 = st.key.y;
+    
+    x = s0 & 0x0fffffff;
+    y = s1 & 0x0fffffff;
+    int keyx = ((int)x) - 134217728;
+    int keyy = ((int)y) - 134217728;
+
+    x = s0 >> 28;
+    y = s1 >> 28;
+
+    data = (y << 4) + x;
+    lb = (int)(data >> 6);
+    h = (int)(data & 0x0000003f);
+    lb -= 2;
+
+    key = int2(keyx, keyy);
+}
+
+void PtoS(out MyStruct st, int2 key, int lid, int rid, int h, int lb)
+{
+    lb += 2;//1~3
+    uint data = (uint)lb * 64 + (uint)h;
+    st.lid = lid;
+    st.rid = rid;
+    key.x += 134217728;
+    key.y += 134217728;
+    uint s0 = key.x;
+    uint s1 = key.y;
+
+    uint data1 = data & 0x0000000f;
+    uint data2 = data >> 4;
+    s0 += data1 << 28;
+    s1 += data2 << 28;
+
+    st.key = uint2(s0, s1);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+[numthreads(16, 16, 1)]
+void MainCalc(uint2 id : SV_DispatchThreadID)
+{
+    if (id.y >= 1080)return;
+    Tex[id.xy] = float4(45.0 / 255.0, 89.0 / 255.0, 88.0 / 255.0, 1);
+}
+
+
+[numthreads(1, 1, 1)]
+void PointSet(uint2 id : SV_DispatchThreadID)
+{
+    uint2 pos;
+    pos.x = inputx;
+    pos.y = inputy;
+    float4 col = float4(1, 0, 0, 1);
+    if (idata == 1) 
+    {
+        col.x = 78.0 / 255.0;
+        col.y = 192.0 / 255.0;
+        col.z = 255.0 / 255.0;
+    }
+
+    if (idata == 2)
+    {
+        col.x = 238.0 / 255.0;
+        col.y = 209.0 / 255.0;
+        col.z = 103.0 / 255.0;
+    }
+
+    if (idata == 3)
+    {
+        col.x = 208.0 / 255.0;
+        col.y = 249.0 / 255.0;
+        col.z = 63.0 / 255.0;
+    }
+
+    if (idata == 4)
+    {
+        col.x = 178.0 / 255.0;
+        col.y = 100.0 / 255.0;
+        col.z = 103.0 / 255.0;
+    }
+
+    if (idata >= 5)
+    {
+        col.x = 168.0 / 255.0;
+        col.y = 141.0 / 255.0;
+        col.z = 103.0 / 255.0;
+    }
+
+    Tex[pos] = col;
+}
+
+
+
+
+
+
+
+
+
+
+[numthreads(1, 1, 1)]
+void AVLInsert(uint threadid : SV_DispatchThreadID)
+{
+    //cnt
+    int cnt = IntData[1];
+    //key
+    int2 key_i2 = int2(key_[0], key_[1]);
+
+    IntData[1]++;
+    //val
+    ValBuffer[cnt] = uint2(val_[0], val_[1]);
+    MyStruct st;
+    PtoS(st, key_i2, -1, -1, 1, 0);
+    KeyBuffer[cnt] = st;
+
+    if (cnt == 0) 
+    {
+        IntData[0] = 0;
+        return;
+    }
+
+    int id = IntData[0];
+    int2 v2i;
+    int li, ri, h, lb;
+    int idlog[36];
+    int k;
+    int p4, p5;
+    
+
+    for (k = 0; k < 36; k++)
+    {
+        st = KeyBuffer[id];
+        idlog[k] = id;
+        StoP(st, v2i, li, ri, p4, p5);
+        int ler = LER(v2i, key_i2);
+        if (ler == 0) return;//souteigai!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        if (ler == -1)
+        {
+            if (ri == -1)
+            {
+                st.rid = cnt;
+                break;
+            }
+            id = ri;
+        }
+        if (ler == 1)
+        {
+            if (li == -1)
+            {
+                st.lid = cnt;
+                break;
+            }
+            id = li;
+        }
+    }
+
+    KeyBuffer[id] = st;
+
+
+
+    for (int i = k; i >= 0; i--)
+    {
+        id = idlog[i];
+        st = KeyBuffer[id];
+        int h1 = 0, h2 = 0, lb1 = 0, lb2 = 0, ll = -1, lr = -1, rl = -1, rr = -1, u = -1, w = -1, xl, xr, xh, xlb;
+        int2 v2ili = int2(0, 0);
+        int2 v2iri = int2(0, 0);
+        int2 p1, w2i;
+
+        StoP(st, v2i, li, ri, h, lb);
+
+        if (li != -1) 
+        {
+            st = KeyBuffer[li];
+            StoP(st, v2ili, ll, lr, h1, lb1);
+        }
+            
+        if (ri != -1) 
+        {
+            st = KeyBuffer[ri];
+            StoP(st, v2iri, rl, rr, h2, lb2);
+        }
+            
+
+        h = max(h1, h2) + 1;
+        lb = h2 - h1;
+
+        int radint = 0;//-2 +2
+        //
+        if (lb >= 2)
+        {
+            if (lb2 > 0)
+            {
+                radint = -1;
+            }
+            else
+            {
+                if (lb2 < 0) radint = 2;
+            }
+        }
+        else
+        {
+            //
+            if (lb <= -2)
+            {
+                if (lb1 < 0)
+                {
+                    radint = 1;
+                }
+                else
+                {
+                    if (lb1 > 0) radint = -2;
+                }
+            }
+        }
+
+
+
+        if (radint == 0)
+        {
+            PtoS(st, v2i, li, ri, h, lb);
+            KeyBuffer[id] = st;
+            continue;
+        }
+
+
+        //
+        int upperid = -1;
+        if (i > 0) upperid = idlog[i - 1];
+
+
+        if ((radint == -1) | (radint == 1))
+        {
+            u = (radint == -1) ? ri : li;
+            int newul, newur;
+            int newvl, newvr;
+            newul = (radint == -1) ? id : ll;
+            newur = (radint == -1) ? rr : id;
+            newvl = (radint == -1) ? li : lr;
+            newvr = (radint == -1) ? rl : ri;
+
+            //u
+            p1 = (radint == -1) ? v2iri : v2ili;
+            p4 = (radint == -1) ? h2 : h1;
+            p5 = (radint == -1) ? lb2 : lb1;
+
+            PtoS(st, p1, newul, newur, p4, p5);
+            idlog[i] = u; i++;
+            KeyBuffer[u] = st;
+
+            //v
+            PtoS(st, v2i, newvl, newvr, h, lb);
+            idlog[i] = id; i++;
+            KeyBuffer[id] = st;
+
+            //matome syori
+            w = u;
+        }
+
+
+        if ((radint == -2) | (radint == 2))
+        {
+            w = (radint == 2) ? rl : lr;
+            u = (radint == 2) ? ri : li;
+            int newul, newur;
+            int newvl, newvr;
+            int newwl, newwr;
+
+            st = KeyBuffer[w];
+            StoP(st, w2i, xl, xr, xh, xlb);
+
+            newwl = (radint == 2) ? id : u;
+            newwr = (radint == 2) ? u : id;
+            newul = (radint == 2) ? xr : ll;
+            newur = (radint == 2) ? rr : xl;
+            newvl = (radint == 2) ? li : xr;
+            newvr = (radint == 2) ? xl : ri;
+
+            //w
+            st.lid = newwl;
+            st.rid = newwr;
+            idlog[i] = w; i++;
+            KeyBuffer[w] = st;
+
+            //u
+            p1 = (radint == 2) ? v2iri : v2ili;
+            p4 = (radint == 2) ? h2 : h1;
+            p5 = (radint == 2) ? lb2 : lb1;
+            PtoS(st, p1, newul, newur, p4, p5);
+            idlog[i] = u; i++;
+            KeyBuffer[u] = st;
+
+            //v
+            PtoS(st, v2i, newvl, newvr, h, lb);
+            idlog[i] = id; i++;
+            KeyBuffer[id] = st;
+        }
+
+
+        //
+        if (upperid == -1)
+        {
+            IntData[0] = w;
+        }
+        else
+        {
+            st = KeyBuffer[upperid];
+            if (st.lid == id) st.lid = w;
+            if (st.rid == id) st.rid = w;
+            KeyBuffer[upperid] = st;
+        }
+
+
+    }
+
+
+    
+
+    return;
+}

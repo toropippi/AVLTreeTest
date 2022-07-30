@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using AVL;
 
-public class AVLTest : MonoBehaviour
+public class AVLTest1 : MonoBehaviour
 {
     // Start is called before the first frame update
     MyAVL avl;

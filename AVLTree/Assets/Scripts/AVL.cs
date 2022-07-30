@@ -7,8 +7,8 @@ namespace AVL
     public class MyAVL
     {
         //key,¶,‰E,‚‚³,ƒ‰ƒxƒ‹
-        List<(Vector2Int, int, int, int, int)> key = new List<(Vector2Int, int, int, int, int)>();
-        List<int> val = new List<int>();
+        public List<(Vector2Int, int, int, int, int)> key = new List<(Vector2Int, int, int, int, int)>();
+        public List<int> val = new List<int>();
         int rootid = 0;
 
         public void Clear() 
