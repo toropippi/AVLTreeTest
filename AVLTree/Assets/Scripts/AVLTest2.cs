@@ -122,17 +122,25 @@ public class AVLTest2 : MonoBehaviour
         }
 
 
-        var stm_c = Gettime();
         avl = new MyAVL();
         Dictionary<Vector2Int, int> alldata = new Dictionary<Vector2Int, int>();
 
+        //‘g‚İ‚İDic‚Å‘ª’è
+        var stm_d = Gettime();
+        for (int i = 0; i < lpnm; i++)
+            alldata[rnd[i]] = 1;
+        var etm_d = Gettime();
+        Debug.Log("DIC" + (etm_d - stm_d) + "ms");
+
+        //©ìAVL‚Å‘ª’è
+        var stm_c = Gettime();
         for (int i = 0; i < lpnm; i++)
         {
-            alldata[rnd[i]] = 1;
             avl.Insert(rnd[i], rnd[i].x * rnd[i].y);
         }
         var etm_c = Gettime();
         Debug.Log("CPU" + (etm_c - stm_c) + "ms");
+
 
         avl.DBG_SORT(alldata);
         Debug.Log("" + lpnm + "" + avl.GetRoot() + "");

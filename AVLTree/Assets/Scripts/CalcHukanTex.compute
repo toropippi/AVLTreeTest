@@ -212,12 +212,14 @@ void AVLInsert(uint threadid : SV_DispatchThreadID)
     int idlog[36];
     int k;
     int p4, p5;
+    bool hflag[36];
     
 
     for (k = 0; k < 36; k++)
     {
         st = KeyBuffer[id];
         idlog[k] = id;
+        hflag[k] = true;
         StoP(st, v2i, li, ri, p4, p5);
         int ler = LER(v2i, key_i2);
         if (ler == 0) return;//souteigai!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -250,7 +252,7 @@ void AVLInsert(uint threadid : SV_DispatchThreadID)
     {
         id = idlog[i];
         st = KeyBuffer[id];
-        int h1 = 0, h2 = 0, lb1 = 0, lb2 = 0, ll = -1, lr = -1, rl = -1, rr = -1, u = -1, w = -1, xl, xr, xh, xlb;
+        int h1 = 0, h2 = 0, lb1 = 0, lb2 = 0, ll = -1, lr = -1, rl = -1, rr = -1, u = -1, w = -1, xl, xr, xh, xlb, h_dmy, lb_dmy;
         int2 v2ili = int2(0, 0);
         int2 v2iri = int2(0, 0);
         int2 p1, w2i;
@@ -270,8 +272,15 @@ void AVLInsert(uint threadid : SV_DispatchThreadID)
         }
             
 
-        h = max(h1, h2) + 1;
-        lb = h2 - h1;
+        h_dmy = max(h1, h2) + 1;
+        lb_dmy = h2 - h1;
+        bool hsame = (h == h_dmy);
+        bool lbsame = (lb_dmy == lb);
+        if (hflag[i] & hsame & lbsame)break;
+        lb = lb_dmy;
+        h = h_dmy;
+        
+
 
         int radint = 0;//-2 +2
         //
@@ -308,6 +317,7 @@ void AVLInsert(uint threadid : SV_DispatchThreadID)
         {
             PtoS(st, v2i, li, ri, h, lb);
             KeyBuffer[id] = st;
+            if (hflag[i] & hsame)break;
             continue;
         }
 
@@ -333,12 +343,16 @@ void AVLInsert(uint threadid : SV_DispatchThreadID)
             p5 = (radint == -1) ? lb2 : lb1;
 
             PtoS(st, p1, newul, newur, p4, p5);
-            idlog[i] = u; i++;
+            idlog[i] = u;
+            hflag[i] = false;
+            i++;
             KeyBuffer[u] = st;
 
             //v
             PtoS(st, v2i, newvl, newvr, h, lb);
-            idlog[i] = id; i++;
+            idlog[i] = id;
+            hflag[i] = false;
+            i++;
             KeyBuffer[id] = st;
 
             //matome syori
@@ -367,7 +381,9 @@ void AVLInsert(uint threadid : SV_DispatchThreadID)
             //w
             st.lid = newwl;
             st.rid = newwr;
-            idlog[i] = w; i++;
+            idlog[i] = w;
+            hflag[i] = false;
+            i++;
             KeyBuffer[w] = st;
 
             //u
@@ -375,12 +391,16 @@ void AVLInsert(uint threadid : SV_DispatchThreadID)
             p4 = (radint == 2) ? h2 : h1;
             p5 = (radint == 2) ? lb2 : lb1;
             PtoS(st, p1, newul, newur, p4, p5);
-            idlog[i] = u; i++;
+            idlog[i] = u;
+            hflag[i] = false;
+            i++;
             KeyBuffer[u] = st;
 
             //v
             PtoS(st, v2i, newvl, newvr, h, lb);
-            idlog[i] = id; i++;
+            idlog[i] = id;
+            hflag[i] = false;
+            i++;
             KeyBuffer[id] = st;
         }
 
